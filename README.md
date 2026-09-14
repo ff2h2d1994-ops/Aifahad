@@ -70,6 +70,9 @@ supabase/seed.sql     -- تعبئة الخدمات الإحدى عشرة بكل 
   - `media`: للمستخدمين المسجلين فقط (`auth.role() = 'authenticated'`) — أي المشرف.
   - `uploads`: للجميع (`true`) — لأن العميل يرفع ملفات مرجعية قبل تسجيل الدخول.
 
+يمكن تنفيذ إعداد bucket `media` والسياسات تلقائيًا من SQL Editor عبر الملف
+`supabase/media.sql`. هذا الملف قابل لإعادة التشغيل ويضبط حد 25MB وأنواع JPG/JPEG وPNG وWEBP وGIF وMP4 وMOV وWEBM.
+
 ---
 
 ## 6) إعداد Environment Variables

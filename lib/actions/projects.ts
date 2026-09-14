@@ -18,16 +18,19 @@ export async function createProject(formData: FormData) {
   const description_ar = String(formData.get("description_ar") || "");
   const description_en = String(formData.get("description_en") || "");
   const category = String(formData.get("category") || "other");
+  const requestedSlug = String(formData.get("slug") || "").trim();
   const featured = formData.get("featured") === "on";
   const execution_date = String(formData.get("execution_date") || "") || null;
 
   if (!title_ar) return { ok: false as const, error: "العنوان بالعربي مطلوب" };
 
+  const links = parseLinks(formData.get("links"));
+
   const supabase = createClient();
   const { data, error } = await supabase
     .from("projects")
     .insert({
-      slug: `${slugify(title_en || title_ar)}-${Date.now().toString(36)}`,
+      slug: requestedSlug ? slugify(requestedSlug) : `${slugify(title_en || title_ar)}-${Date.now().toString(36)}`,
       title_ar,
       title_en: title_en || title_ar,
       description_ar,
@@ -37,7 +40,7 @@ export async function createProject(formData: FormData) {
       execution_date,
       media: [],
       before_after: [],
-      links: [],
+      links,
     })
     .select("id")
     .single();
@@ -59,21 +62,13 @@ export async function updateProject(id: string, formData: FormData) {
     description_ar: String(formData.get("description_ar") || ""),
     description_en: String(formData.get("description_en") || ""),
     category: String(formData.get("category") || "other"),
+    slug: slugify(String(formData.get("slug") || "")) || `project-${Date.now().toString(36)}`,
     featured: formData.get("featured") === "on",
     visible: formData.get("visible") === "on",
     execution_date: String(formData.get("execution_date") || "") || null,
   };
 
-  const linksRaw = String(formData.get("links") || "").trim();
-  if (linksRaw) {
-    patch.links = linksRaw
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => {
-        const [label, url] = line.split("|").map((s) => s.trim());
-        return { label: label || url, url };
-      });
-  }
+  patch.links = parseLinks(formData.get("links"));
 
   const supabase = createClient();
   const { error } = await supabase.from("projects").update(patch).eq("id", id);
@@ -84,14 +79,14 @@ export async function updateProject(id: string, formData: FormData) {
   return { ok: true as const };
 }
 
-export async function addProjectMedia(id: string, mediaUrl: string, type: "image" | "video") {
+export async function addProjectMedia(id: string, mediaUrl: string, type: "image" | "video", cover = false) {
   const admin = await getAuthorizedUser();
   if (!admin) return { ok: false as const, error: "غير مصرح" };
 
   const supabase = createClient();
   const { data: project } = await supabase.from("projects").select("media").eq("id", id).single();
   const media = Array.isArray(project?.media) ? project.media : [];
-  media.push({ type, url: mediaUrl });
+  media.push({ type, url: mediaUrl, cover: cover && type === "image" });
 
   const { error } = await supabase.from("projects").update({ media }).eq("id", id);
   if (error) return { ok: false as const, error: error.message };
@@ -113,6 +108,9 @@ export async function removeProjectMedia(id: string, mediaUrl: string) {
   const { error } = await supabase.from("projects").update({ media: next }).eq("id", id);
   if (error) return { ok: false as const, error: error.message };
 
+  const storagePath = getMediaStoragePath(mediaUrl);
+  if (storagePath) await supabase.storage.from("media").remove([storagePath]);
+
   revalidatePath(`/admin/projects/${id}/edit`);
   revalidatePath("/portfolio");
   return { ok: true as const };
@@ -131,6 +129,19 @@ export async function toggleProjectVisibility(id: string, visible: boolean) {
   return { ok: true as const };
 }
 
+export async function toggleProjectFeatured(id: string, featured: boolean) {
+  const admin = await getAuthorizedUser();
+  if (!admin) return { ok: false as const, error: "غير مصرح" };
+
+  const supabase = createClient();
+  const { error } = await supabase.from("projects").update({ featured }).eq("id", id);
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath("/admin/projects");
+  revalidatePath("/portfolio");
+  return { ok: true as const };
+}
+
 export async function reorderProject(id: string, order_index: number) {
   const admin = await getAuthorizedUser();
   if (!admin) return { ok: false as const, error: "غير مصرح" };
@@ -140,6 +151,30 @@ export async function reorderProject(id: string, order_index: number) {
   if (error) return { ok: false as const, error: error.message };
 
   revalidatePath("/admin/projects");
+  return { ok: true as const };
+}
+
+export async function moveProject(id: string, direction: "up" | "down") {
+  const admin = await getAuthorizedUser();
+  if (!admin) return { ok: false as const, error: "غير مصرح" };
+
+  const supabase = createClient();
+  const { data: projects, error: fetchError } = await supabase.from("projects").select("id, order_index").order("order_index", { ascending: true });
+  if (fetchError) return { ok: false as const, error: fetchError.message };
+  const index = (projects || []).findIndex((project) => project.id === id);
+  const neighborIndex = direction === "up" ? index - 1 : index + 1;
+  if (index < 0 || neighborIndex < 0 || neighborIndex >= (projects || []).length) return { ok: true as const };
+
+  const current = projects![index];
+  const neighbor = projects![neighborIndex];
+  const updates = await Promise.all([
+    supabase.from("projects").update({ order_index: neighbor.order_index }).eq("id", current.id),
+    supabase.from("projects").update({ order_index: current.order_index }).eq("id", neighbor.id),
+  ]);
+  const failed = updates.find((result) => result.error);
+  if (failed?.error) return { ok: false as const, error: failed.error.message };
+  revalidatePath("/admin/projects");
+  revalidatePath("/portfolio");
   return { ok: true as const };
 }
 
@@ -179,10 +214,37 @@ export async function deleteProject(id: string) {
   if (!admin) return { ok: false as const, error: "غير مصرح" };
 
   const supabase = createClient();
+  const { data: project } = await supabase.from("projects").select("media").eq("id", id).single();
+  const paths = (Array.isArray(project?.media) ? project.media : [])
+    .map((item: { url?: string }) => item.url ? getMediaStoragePath(item.url) : null)
+    .filter((path): path is string => Boolean(path));
+  if (paths.length > 0) await supabase.storage.from("media").remove(paths);
+
   const { error } = await supabase.from("projects").delete().eq("id", id);
   if (error) return { ok: false as const, error: error.message };
 
   revalidatePath("/admin/projects");
   revalidatePath("/portfolio");
   return { ok: true as const };
+}
+
+function parseLinks(value: FormDataEntryValue | null) {
+  const linksRaw = String(value || "").trim();
+  if (!linksRaw) return [];
+  return linksRaw.split("\n").filter(Boolean).flatMap((line) => {
+    const [label, url] = line.split("|").map((part) => part.trim());
+    if (!url) return [];
+    try {
+      new URL(url);
+    } catch {
+      return [];
+    }
+    return [{ label: label || url, url }];
+  });
+}
+
+function getMediaStoragePath(url: string) {
+  const marker = "/storage/v1/object/public/media/";
+  const index = url.indexOf(marker);
+  return index >= 0 ? decodeURIComponent(url.slice(index + marker.length)) : null;
 }

@@ -49,7 +49,7 @@ export function PortfolioGrid({ projects, initialCategory }: { projects: Project
       ) : (
         <div className="columns-1 gap-4 sm:columns-2 lg:columns-3 [&>*]:mb-4">
           {filtered.map((p) => {
-            const cover = p.media?.[0];
+            const cover = p.media?.find((media) => media.cover) || p.media?.find((media) => media.type === "image") || p.media?.[0];
             return (
               <Link
                 key={p.id}
@@ -60,6 +60,8 @@ export function PortfolioGrid({ projects, initialCategory }: { projects: Project
                   <div className="relative aspect-[4/3] w-full bg-base-layer2">
                     <Image src={cover.url} alt={p.title_ar} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
                   </div>
+                ) : cover?.type === "video" ? (
+                  <video src={cover.url} muted playsInline className="aspect-[4/3] w-full object-cover" />
                 ) : (
                   <div className="flex aspect-[4/3] w-full items-center justify-center bg-base-layer2 text-ink-muted">
                     {p.title_ar[0]}

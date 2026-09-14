@@ -23,6 +23,7 @@ export type MediaItem = {
   type: "image" | "video";
   url: string;
   thumbnail_url?: string;
+  cover?: boolean;
 };
 
 export type BeforeAfter = {

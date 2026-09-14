@@ -2,10 +2,10 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toggleProjectVisibility, deleteProject } from "@/lib/actions/projects";
+import { deleteProject, moveProject, toggleProjectFeatured, toggleProjectVisibility } from "@/lib/actions/projects";
 import { useToast } from "@/components/ToastProvider";
 
-export function ProjectRowActions({ id, visible }: { id: string; visible: boolean }) {
+export function ProjectRowActions({ id, visible, featured, orderIndex }: { id: string; visible: boolean; featured: boolean; orderIndex: number }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const toast = useToast();
@@ -24,6 +24,40 @@ export function ProjectRowActions({ id, visible }: { id: string; visible: boolea
       >
         {visible ? "إخفاء" : "إظهار"}
       </button>
+      <button
+        disabled={pending}
+        onClick={() => startTransition(async () => {
+          const res = await toggleProjectFeatured(id, !featured);
+          if (res.ok) toast(featured ? "تم إلغاء التمييز" : "تم تمييز العمل", "success");
+          else toast(res.error, "error");
+          router.refresh();
+        })}
+        className="rounded-full border border-black/10 px-3 py-1 text-xs text-ink-muted hover:text-ink"
+      >
+        {featured ? "إلغاء التمييز" : "تمييز"}
+      </button>
+      <button
+        disabled={pending || orderIndex <= 0}
+        onClick={() => startTransition(async () => {
+          const res = await moveProject(id, "up");
+          if (!res.ok) toast(res.error, "error");
+          router.refresh();
+        })}
+        className="rounded-full border border-black/10 px-2 py-1 text-xs text-ink-muted disabled:opacity-40"
+        aria-label="تحريك للأعلى"
+        title="تحريك للأعلى"
+      >↑</button>
+      <button
+        disabled={pending}
+        onClick={() => startTransition(async () => {
+          const res = await moveProject(id, "down");
+          if (!res.ok) toast(res.error, "error");
+          router.refresh();
+        })}
+        className="rounded-full border border-black/10 px-2 py-1 text-xs text-ink-muted"
+        aria-label="تحريك للأسفل"
+        title="تحريك للأسفل"
+      >↓</button>
       <button
         disabled={pending}
         onClick={() => {

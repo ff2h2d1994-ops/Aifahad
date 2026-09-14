@@ -35,7 +35,7 @@ export default async function AdminProjectsPage() {
                 <td className="py-3 text-ink-muted">{p.category}</td>
                 <td className="py-3 text-ink-muted">{p.visible ? "منشور" : "مخفي"}</td>
                 <td className="py-3 text-ink-muted">{p.featured ? "نعم" : "—"}</td>
-                <td className="py-3"><ProjectRowActions id={p.id} visible={p.visible} /></td>
+                <td className="py-3"><ProjectRowActions id={p.id} visible={p.visible} featured={p.featured} orderIndex={p.order_index} /></td>
               </tr>
             ))}
             {(!projects || projects.length === 0) && (
