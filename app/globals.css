@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  /* Fallback defaults — overridden per-request by the admin's saved
+     theme colors (see app/layout.tsx). RGB triplets for Tailwind's
+     rgb(var(...) / <alpha-value>) utilities, hex for raw CSS use. */
+  --color-electric: 201 162 39;
+  --color-electric-soft: 220 195 115;
+  --color-violet: 139 106 46;
+  --color-cyan: 232 206 139;
+  --color-ember: 181 101 29;
+  --color-electric-hex: #C9A227;
+  --color-electric-soft-hex: #DCC373;
+  --color-violet-hex: #8B6A2E;
+  --color-cyan-hex: #E8CE8B;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  background-color: #F7F2E7;
+  color: #1C1710;
+}
+
+.glass {
+  background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(255,255,255,0.55));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(28,23,16,0.08);
+  box-shadow: 0 4px 24px rgba(28,23,16,0.05);
+}
+
+.glass:hover {
+  border-color: rgba(28,23,16,0.18);
+}
+
+.holo-ring {
+  background: conic-gradient(from 180deg, var(--color-electric-hex), var(--color-violet-hex), var(--color-cyan-hex), var(--color-electric-hex));
+  filter: blur(60px);
+  opacity: 0.22;
+}
+
+.text-gradient {
+  background: linear-gradient(90deg, var(--color-violet-hex), var(--color-electric-hex) 55%, var(--color-electric-soft-hex));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.text-gradient-animated {
+  animation: shimmer 3.5s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+::selection {
+  background: rgb(var(--color-electric) / 0.3);
+}
+
+/* visible focus for accessibility — darker (violet/bronze) rather than
+   the lighter "soft" tint, since it needs to read clearly on a light
+   cream background */
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--color-violet-hex);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
